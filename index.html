@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Landscape Clients</title>
+  <meta name="theme-color" content="#2f855a" />
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; background: #f7fafc; }
+    header { background: #2f855a; color: white; padding: 16px; text-align: center; }
+    main { padding: 16px; }
+    h2 { margin-top: 24px; }
+    input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 6px; border: 1px solid #ccc; }
+    button { background: #2f855a; color: white; border: none; font-size: 16px; }
+    .client { background: white; padding: 12px; margin-top: 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .actions { margin-top: 8px; display: flex; gap: 8px; }
+    .actions button { flex: 1; background: #3182ce; }
+    .delete { background: #e53e3e !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Landscape Clients</h1>
+    <p>Clientes • Clients</p>
+  </header>
+
+  <main>
+    <h2>Adicionar Cliente / Add Client</h2>
+    <input id="name" placeholder="Nome / Name" />
+    <input id="eircode" placeholder="Eircode" />
+    <textarea id="notes" placeholder="Observações / Notes"></textarea>
+    <button onclick="addClient()">Salvar / Save</button>
+
+    <h2>Clientes Salvos / Saved Clients</h2>
+    <input id="search" placeholder="Buscar / Search" oninput="render()" />
+    <div id="list"></div>
+  </main>
+
+  <script>
+    const getClients = () => JSON.parse(localStorage.getItem('clients') || '[]');
+    const saveClients = c => localStorage.setItem('clients', JSON.stringify(c));
+
+    function addClient() {
+      const name = document.getElementById('name').value.trim();
+      const eircode = document.getElementById('eircode').value.trim();
+      const notes = document.getElementById('notes').value.trim();
+      if (!name || !eircode) return alert('Nome e Eircode são obrigatórios');
+      const clients = getClients();
+      clients.push({ name, eircode, notes });
+      saveClients(clients);
+      document.getElementById('name').value = '';
+      document.getElementById('eircode').value = '';
+      document.getElementById('notes').value = '';
+      render();
+    }
+
+    function removeClient(index) {
+      const clients = getClients();
+      clients.splice(index, 1);
+      saveClients(clients);
+      render();
+    }
+
+    function render() {
+      const search = document.getElementById('search').value.toLowerCase();
+      const list = document.getElementById('list');
+      list.innerHTML = '';
+      getClients().forEach((c, i) => {
+        if (c.name.toLowerCase().includes(search) || c.eircode.toLowerCase().includes(search)) {
+          const div = document.createElement('div');
+          div.className = 'client';
+          div.innerHTML = `
+            <strong>${c.name}</strong><br>
+            Eircode: ${c.eircode}<br>
+            ${c.notes ? '📝 ' + c.notes + '<br>' : ''}
+            <div class="actions">
+              <button onclick="window.open('https://www.google.com/maps/search/?api=1&query=${c.eircode}')">Maps</button>
+              <button class="delete" onclick="removeClient(${i})">Excluir / Delete</button>
+            </div>`;
+          list.appendChild(div);
+        }
+      });
+    }
+
+    render();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+</body>
+</html>
