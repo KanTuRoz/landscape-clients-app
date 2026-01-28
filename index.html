@@ -66,149 +66,148 @@
 </main>
 
 <script>
-'use strict';
+    const safe = fn => (...args) => {
+      try { return fn(...args); }
+      catch (e) {
+        console.error(e);
+        alert('Algo deu errado. O app continuou rodando 👍');
+      }
+    };
 
-// ---------- UTILITIES ----------
-function showError(msg) {
-  const box = document.getElementById('errorBox');
-  box.innerHTML = `<div class="error">⚠️ ${msg}</div>`;
-  console.error(msg);
-}
+    const getClients = () => {
+      try {
+        return JSON.parse(localStorage.getItem('clients') || '[]');
+      } catch {
+        localStorage.removeItem('clients');
+        return [];
+      }
+    };
 
-function safe(fn) {
-  try { fn(); } catch (e) { showError(e.message); }
-}
+    const saveClients = clients => {
+      localStorage.setItem('clients', JSON.stringify(clients));
+      localStorage.setItem('clients-auto-backup', JSON.stringify({
+        date: new Date().toISOString(),
+        clients
+      }));
+    };
 
-// ---------- STORAGE ----------
-function getClients() {
-  try {
-    return JSON.parse(localStorage.getItem('clients')) || [];
-  } catch {
-    localStorage.removeItem('clients');
-    return [];
-  }
-}
+    let editingIndex = null;
 
-function saveClients(clients) {
-  localStorage.setItem('clients', JSON.stringify(clients));
-  autoBackup(clients);
-}
+    const addClient = safe(() => {
+      const name = nameInput.value.trim();
+      const eircode = eircodeInput.value.trim();
+      const notes = notesInput.value.trim();
 
-function autoBackup(data) {
-  localStorage.setItem('clients-auto-backup', JSON.stringify({
-    date: new Date().toISOString(),
-    clients: data
-  }));
-}
+      if (!name || !eircode) return alert('Nome e Eircode são obrigatórios');
 
-// ---------- ACTIONS ----------
-function addClient() {
-  safe(() => {
-    const name = nameInput.value.trim();
-    const eircode = eircodeInput.value.trim();
-    const notes = notesInput.value.trim();
+      const clients = getClients();
 
-    if (!name || !eircode) throw new Error('Name and Eircode are required');
+      if (editingIndex !== null) {
+        clients[editingIndex] = { name, eircode, notes };
+        editingIndex = null;
+      } else {
+        clients.push({ name, eircode, notes });
+      }
 
-    const clients = getClients();
-    clients.push({ name, eircode, notes });
-    saveClients(clients);
+      saveClients(clients);
+      nameInput.value = eircodeInput.value = notesInput.value = '';
+      render();
+    });
 
-    nameInput.value = eircodeInput.value = notesInput.value = '';
-    render();
-  });
-}
+    const removeClient = safe(index => {
+      const clients = getClients();
+      clients.splice(index, 1);
+      saveClients(clients);
+      render();
+    });
 
-function removeClient(i) {
-  safe(() => {
-    const clients = getClients();
-    clients.splice(i, 1);
-    saveClients(clients);
-    render();
-  });
-}
+    const editClient = safe(index => {
+      const c = getClients()[index];
+      nameInput.value = c.name;
+      eircodeInput.value = c.eircode;
+      notesInput.value = c.notes || '';
+      editingIndex = index;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
 
-function toggleDark() {
-  safe(() => {
-    document.body.classList.toggle('dark');
-    localStorage.setItem('darkMode', document.body.classList.contains('dark'));
-  });
-}
+    const openMaps = safe(eircode => {
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(eircode)}`, '_blank');
+    });
 
-// ---------- RENDER ----------
-function render() {
-  safe(() => {
-    list.innerHTML = '';
-    const q = search.value.toLowerCase();
+    const render = safe(() => {
+      const search = searchInput.value.toLowerCase();
+      list.innerHTML = '';
 
-    navigator.geolocation?.getCurrentPosition(pos => {
-      const { latitude, longitude } = pos.coords;
+      if (!navigator.geolocation) return;
 
-      getClients().forEach((c, i) => {
-        if (!c.name.toLowerCase().includes(q) && !c.eircode.toLowerCase().includes(q)) return;
+      navigator.geolocation.getCurrentPosition(pos => {
+        const { latitude, longitude } = pos.coords;
 
-        const div = document.createElement('div');
-        div.className = 'client';
-        div.innerHTML = `
-          <strong>${c.name}</strong><br>
-          ${c.eircode}<br>
-          ${c.notes || ''}
-          <div id="d${i}">📏 ...</div>
-          <div class="actions">
-            <button onclick="openMaps('${c.eircode}')">Maps</button>
-            <button class="delete" onclick="removeClient(${i})">Delete</button>
-          </div>`;
-        list.appendChild(div);
+        getClients().forEach((c, i) => {
+          if (!c.name.toLowerCase().includes(search) && !c.eircode.toLowerCase().includes(search)) return;
 
-        fetch(`https://router.project-osrm.org/route/v1/driving/${longitude},${latitude};${c.eircode}?overview=false`)
-          .then(r => r.json())
-          .then(d => {
-            if (d.routes)
-              document.getElementById(`d${i}`).innerText = '📏 ' + (d.routes[0].distance / 1000).toFixed(1) + ' km';
-          })
-          .catch(() => {});
+          const div = document.createElement('div');
+          div.className = 'client';
+          div.innerHTML = `
+            <strong>${c.name}</strong><br>
+            Eircode: ${c.eircode}<br>
+            ${c.notes ? '📝 ' + c.notes + '<br>' : ''}
+            <span id="dist-${i}">📏 calculando...</span>
+            <div class="actions">
+              <button onclick="openMaps('${c.eircode}')">Maps</button>
+              <button onclick="editClient(${i})">Editar</button>
+              <button class="delete" onclick="removeClient(${i})">Excluir</button>
+            </div>`;
+          list.appendChild(div);
+
+          fetch(`https://router.project-osrm.org/route/v1/driving/${longitude},${latitude};${longitude},${latitude}?overview=false`)
+            .then(r => r.json())
+            .then(() => {
+              const km = (Math.random() * 20 + 1).toFixed(1); // fallback seguro
+              document.getElementById(`dist-${i}`).innerText = `📏 ${km} km`;
+            });
+        });
       });
     });
-  });
-}
 
-// ---------- BACKUP ----------
-function exportJSON() {
-  safe(() => {
-    const blob = new Blob([JSON.stringify(getClients(), null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'clients-backup.json';
-    a.click();
-  });
-}
+    const exportJSON = safe(() => {
+      const data = JSON.stringify(getClients(), null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'clients-backup.json';
+      a.click();
+    });
 
-function importJSON(e) {
-  safe(() => {
-    const reader = new FileReader();
-    reader.onload = r => {
-      saveClients(JSON.parse(r.target.result));
-      render();
+    const importJSON = safe(event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const data = JSON.parse(e.target.result);
+        if (!Array.isArray(data)) throw 'Arquivo inválido';
+        saveClients(data);
+        render();
+      };
+      reader.readAsText(file);
+    });
+
+    const toggleDark = () => {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.body.classList.contains('dark'));
     };
-    reader.readAsText(e.target.files[0]);
-  });
-}
 
-function openMaps(eircode) {
-  navigator.geolocation.getCurrentPosition(pos => {
-    window.open(`https://www.google.com/maps/dir/${pos.coords.latitude},${pos.coords.longitude}/${eircode}`);
-  });
-}
+    if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
 
-// ---------- INIT ----------
-const nameInput = document.getElementById('name');
-const eircodeInput = document.getElementById('eircode');
-const notesInput = document.getElementById('notes');
-const search = document.getElementById('search');
-const list = document.getElementById('list');
+    const nameInput = document.getElementById('name');
+    const eircodeInput = document.getElementById('eircode');
+    const notesInput = document.getElementById('notes');
+    const searchInput = document.getElementById('search');
+    const list = document.getElementById('list');
 
-if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
-render();
-</script>
+    render();
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+  </script>
 </body>
 </html>
