@@ -28,58 +28,19 @@
       --secondary: #63b3ed;
     }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-    }
-
-    header {
-      background: var(--header);
-      color: white;
-      padding: 16px;
-      text-align: center;
-    }
-
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
+    header { background: var(--header); color: white; padding: 16px; text-align: center; }
     main { padding: 16px; }
-
-    input, textarea, button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 8px;
-      border-radius: 6px;
-      border: 1px solid #4a5568;
-      background: var(--card);
-      color: var(--text);
-    }
-
-    button {
-      background: var(--button);
-      color: white;
-      border: none;
-      font-size: 16px;
-    }
-
-    .client {
-      background: var(--card);
-      padding: 12px;
-      margin-top: 12px;
-      border-radius: 8px;
-    }
-
-    .actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-    }
-
+    input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 6px; border: 1px solid #4a5568; background: var(--card); color: var(--text); }
+    button { background: var(--button); color: white; border: none; font-size: 16px; }
+    .client { background: var(--card); padding: 12px; margin-top: 12px; border-radius: 8px; }
+    .actions { display: flex; gap: 8px; margin-top: 8px; }
     .actions button { flex: 1; background: var(--secondary); }
     .delete { background: var(--danger); }
     .toggle { background: none; border: 1px solid #ccc; }
+    .error { background:#fed7d7; color:#742a2a; padding:10px; border-radius:6px; margin-top:10px; }
   </style>
 </head>
-
 <body>
 <header>
   <h1>Landscape Clients</h1>
@@ -89,137 +50,165 @@
 
 <main>
   <h2>Add Client / Adicionar</h2>
-  <input id="name" placeholder="Name / Nome">
-  <input id="eircode" placeholder="Eircode">
+  <input id="name" placeholder="Name / Nome" />
+  <input id="eircode" placeholder="Eircode" />
   <textarea id="notes" placeholder="Notes / Observações"></textarea>
   <button onclick="addClient()">Save / Salvar</button>
 
   <h2>Saved Clients</h2>
-  <input id="search" placeholder="Search / Buscar" oninput="render()">
+  <input id="search" placeholder="Search / Buscar" oninput="render()" />
 
   <button onclick="exportJSON()">📤 Backup (.json)</button>
-  <input type="file" accept=".json" onchange="importJSON(event)">
+  <input type="file" accept=".json" onchange="importJSON(event)" />
 
+  <div id="errorBox"></div>
   <div id="list"></div>
 </main>
 
 <script>
-  const getClients = () =>
-    JSON.parse(localStorage.getItem("clients") || "[]");
+'use strict';
 
-  const saveClients = clients => {
-    localStorage.setItem("clients", JSON.stringify(clients));
-    autoBackup(clients);
-  };
+// ---------- UTILITIES ----------
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  box.innerHTML = `<div class="error">⚠️ ${msg}</div>`;
+  console.error(msg);
+}
 
-  function addClient() {
+function safe(fn) {
+  try { fn(); } catch (e) { showError(e.message); }
+}
+
+// ---------- STORAGE ----------
+function getClients() {
+  try {
+    return JSON.parse(localStorage.getItem('clients')) || [];
+  } catch {
+    localStorage.removeItem('clients');
+    return [];
+  }
+}
+
+function saveClients(clients) {
+  localStorage.setItem('clients', JSON.stringify(clients));
+  autoBackup(clients);
+}
+
+function autoBackup(data) {
+  localStorage.setItem('clients-auto-backup', JSON.stringify({
+    date: new Date().toISOString(),
+    clients: data
+  }));
+}
+
+// ---------- ACTIONS ----------
+function addClient() {
+  safe(() => {
     const name = nameInput.value.trim();
     const eircode = eircodeInput.value.trim();
     const notes = notesInput.value.trim();
-    if (!name || !eircode) return alert("Name and Eircode required");
+
+    if (!name || !eircode) throw new Error('Name and Eircode are required');
 
     const clients = getClients();
     clients.push({ name, eircode, notes });
     saveClients(clients);
 
-    nameInput.value = eircodeInput.value = notesInput.value = "";
+    nameInput.value = eircodeInput.value = notesInput.value = '';
     render();
-  }
+  });
+}
 
-  function removeClient(i) {
+function removeClient(i) {
+  safe(() => {
     const clients = getClients();
     clients.splice(i, 1);
     saveClients(clients);
     render();
-  }
+  });
+}
 
-  function render() {
+function toggleDark() {
+  safe(() => {
+    document.body.classList.toggle('dark');
+    localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+  });
+}
+
+// ---------- RENDER ----------
+function render() {
+  safe(() => {
+    list.innerHTML = '';
     const q = search.value.toLowerCase();
-    list.innerHTML = "";
 
     navigator.geolocation?.getCurrentPosition(pos => {
       const { latitude, longitude } = pos.coords;
 
       getClients().forEach((c, i) => {
-        if (!c.name.toLowerCase().includes(q) &&
-            !c.eircode.toLowerCase().includes(q)) return;
+        if (!c.name.toLowerCase().includes(q) && !c.eircode.toLowerCase().includes(q)) return;
 
-        const div = document.createElement("div");
-        div.className = "client";
+        const div = document.createElement('div');
+        div.className = 'client';
         div.innerHTML = `
           <strong>${c.name}</strong><br>
           ${c.eircode}<br>
-          ${c.notes || ""}
+          ${c.notes || ''}
           <div id="d${i}">📏 ...</div>
           <div class="actions">
             <button onclick="openMaps('${c.eircode}')">Maps</button>
             <button class="delete" onclick="removeClient(${i})">Delete</button>
-          </div>
-        `;
+          </div>`;
         list.appendChild(div);
 
-        fetch(
-          `https://router.project-osrm.org/route/v1/driving/${longitude},${latitude};${c.eircode}?overview=false`
-        )
+        fetch(`https://router.project-osrm.org/route/v1/driving/${longitude},${latitude};${c.eircode}?overview=false`)
           .then(r => r.json())
           .then(d => {
             if (d.routes)
-              document.getElementById(`d${i}`).innerText =
-                "📏 " + (d.routes[0].distance / 1000).toFixed(1) + " km";
-          });
+              document.getElementById(`d${i}`).innerText = '📏 ' + (d.routes[0].distance / 1000).toFixed(1) + ' km';
+          })
+          .catch(() => {});
       });
     });
-  }
+  });
+}
 
-  function toggleDark() {
-    document.body.classList.toggle("dark");
-    localStorage.setItem("darkMode",
-      document.body.classList.contains("dark"));
-  }
-
-  function exportJSON() {
-    const blob = new Blob(
-      [JSON.stringify(getClients(), null, 2)],
-      { type: "application/json" }
-    );
-    const a = document.createElement("a");
+// ---------- BACKUP ----------
+function exportJSON() {
+  safe(() => {
+    const blob = new Blob([JSON.stringify(getClients(), null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = "clients-backup.json";
+    a.download = 'clients-backup.json';
     a.click();
-  }
+  });
+}
 
-  function importJSON(e) {
+function importJSON(e) {
+  safe(() => {
     const reader = new FileReader();
     reader.onload = r => {
       saveClients(JSON.parse(r.target.result));
       render();
     };
     reader.readAsText(e.target.files[0]);
-  }
+  });
+}
 
-  function autoBackup(data) {
-    localStorage.setItem("clients-auto-backup",
-      JSON.stringify({ date: new Date(), data }));
-  }
+function openMaps(eircode) {
+  navigator.geolocation.getCurrentPosition(pos => {
+    window.open(`https://www.google.com/maps/dir/${pos.coords.latitude},${pos.coords.longitude}/${eircode}`);
+  });
+}
 
-  function openMaps(eircode) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      window.open(
-        `https://www.google.com/maps/dir/${pos.coords.latitude},${pos.coords.longitude}/${eircode}`
-      );
-    });
-  }
+// ---------- INIT ----------
+const nameInput = document.getElementById('name');
+const eircodeInput = document.getElementById('eircode');
+const notesInput = document.getElementById('notes');
+const search = document.getElementById('search');
+const list = document.getElementById('list');
 
-  const nameInput = document.getElementById("name");
-  const eircodeInput = document.getElementById("eircode");
-  const notesInput = document.getElementById("notes");
-  const search = document.getElementById("search");
-  const list = document.getElementById("list");
-
-  if (localStorage.getItem("darkMode") === "true")
-    document.body.classList.add("dark");
-
-  render();
+if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
+render();
 </script>
 </body>
 </html>
