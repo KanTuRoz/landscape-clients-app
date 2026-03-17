@@ -75,3 +75,18 @@ function createClientCard(client, originalIndex, coords) {
   `;
   return div;
 }
+// Verifica atualizações do service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          // Nova versão instalada e pronta para usar
+          console.log('Nova versão disponível. Recarregando...');
+          window.location.reload(); // Recarrega a página para aplicar
+        }
+      });
+    });
+  });
+}
