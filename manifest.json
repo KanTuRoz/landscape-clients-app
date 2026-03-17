@@ -1,15 +1,24 @@
 {
   "name": "Landscape Clients",
   "short_name": "Clients",
+  "description": "App pessoal para gerenciar clientes de landscape com Eircode",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#2f855a",
   "theme_color": "#2f855a",
+  "orientation": "portrait",
   "icons": [
     {
-      "src": "icon.png",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
