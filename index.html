@@ -1,213 +1,172 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Landscape Clients</title>
-  <meta name="theme-color" content="#2f855a" />
-  <link rel="manifest" href="manifest.json" />
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Landscape Clients</title>
+<meta name="theme-color" content="#2f855a" />
 
-  <style>
-    :root {
-      --bg: #f7fafc;
-      --card: #ffffff;
-      --text: #1a202c;
-      --header: #2f855a;
-      --button: #2f855a;
-      --danger: #e53e3e;
-      --secondary: #3182ce;
-    }
-
-    body.dark {
-      --bg: #1a202c;
-      --card: #2d3748;
-      --text: #edf2f7;
-      --header: #22543d;
-      --button: #38a169;
-      --danger: #fc8181;
-      --secondary: #63b3ed;
-    }
-
-    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
-    header { background: var(--header); color: white; padding: 16px; text-align: center; }
-    main { padding: 16px; }
-    input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 6px; border: 1px solid #4a5568; background: var(--card); color: var(--text); }
-    button { background: var(--button); color: white; border: none; font-size: 16px; }
-    .client { background: var(--card); padding: 12px; margin-top: 12px; border-radius: 8px; }
-    .actions { display: flex; gap: 8px; margin-top: 8px; }
-    .actions button { flex: 1; background: var(--secondary); }
-    .delete { background: var(--danger); }
-    .toggle { background: none; border: 1px solid #ccc; }
-    .error { background:#fed7d7; color:#742a2a; padding:10px; border-radius:6px; margin-top:10px; }
-  </style>
+<style>
+body { font-family: -apple-system; margin:0; padding:16px; }
+input, button { width:100%; padding:12px; margin-top:8px; }
+.client { border:1px solid #ccc; padding:10px; margin-top:10px; }
+.actions { display:flex; gap:6px; margin-top:6px; }
+.actions button { flex:1; }
+</style>
 </head>
+
 <body>
-<header>
-  <h1>Landscape Clients</h1>
-  <p>Clientes • Clients</p>
-  <button class="toggle" onclick="toggleDark()">🌙 / ☀️ Dark Mode</button>
-</header>
+<h2>Add Client</h2>
+<input id="name" placeholder="Name">
+<input id="eircode" placeholder="Eircode">
+<input id="notes" placeholder="Notes">
+<button onclick="addClient()">Save</button>
 
-<main>
-  <h2>Add Client / Adicionar</h2>
-  <input id="name" placeholder="Name / Nome" />
-  <input id="eircode" placeholder="Eircode" />
-  <textarea id="notes" placeholder="Notes / Observações"></textarea>
-  <button onclick="addClient()">Save / Salvar</button>
+<h2>Search</h2>
+<input id="search" placeholder="Search name or eircode" oninput="render()">
 
-  <h2>Saved Clients</h2>
-  <input id="search" placeholder="Search / Buscar" oninput="render()" />
+<button onclick="toggleList()">Show / Hide Clients</button>
 
-  <button onclick="exportJSON()">📤 Backup (.json)</button>
-  <input type="file" accept=".json" onchange="importJSON(event)" />
-
-  <div id="errorBox"></div>
-  <div id="list"></div>
-</main>
+<div id="list"></div>
 
 <script>
-    const safe = fn => (...args) => {
-      try { return fn(...args); }
-      catch (e) {
-        console.error(e);
-        alert('Algo deu errado. O app continuou rodando 👍');
-      }
-    };
+let showList = false;
+let editingIndex = null;
 
-    const getClients = () => {
-      try {
-        return JSON.parse(localStorage.getItem('clients') || '[]');
-      } catch {
-        localStorage.removeItem('clients');
-        return [];
-      }
-    };
+const defaultClients = [
+  { name: "Fiona Ryan", eircode: "V95TR29", notes: "joga no penhasco" },
+  { name: "Admiralty Lodge", eircode: "V95TE8A", notes: "" },
+  { name: "Joan Laffan", eircode: "V95K6V3", notes: "" },
+  { name: "Mounttrivers", eircode: "V15 AH94", notes: "" },
+  { name: "Des O Connors", eircode: "V95 NH61", notes: "" },
+  { name: "Annet Vaughans", eircode: "V95 RDK3", notes: "Frente hotel abandonado Liscannor" },
+  { name: "Donal Ring", eircode: "V95N1F2", notes: "" },
+  { name: "James Griffin", eircode: "V95Y5C0", notes: "Casa de mil B&B" },
+  { name: "Fiona McCormack", eircode: "V95CP23", notes: "House blue in the Main Street" },
+  { name: "Garda Scariff", eircode: "V94FP30", notes: "" },
+  { name: "Garda Tulla", eircode: "V95F978", notes: "" },
+  { name: "Garda Newmarket on Fergus", eircode: "V95D968", notes: "" },
+  { name: "Garda Sixmilebridge", eircode: "V95YD63", notes: "" },
+  { name: "Garda Kildysart", eircode: "V95P402", notes: "" },
+  { name: "Garda Kilmihil", eircode: "V15HK38", notes: "" },
+  { name: "Garda Kilrush", eircode: "V15Y191", notes: "" },
+  { name: "Chris Ruddle", eircode: "V95 V4H9", notes: "Esquina" },
+  { name: "Hillary", eircode: "V15 YX76", notes: "" },
+  { name: "Elizabeth Kronlage", eircode: "V15K793", notes: "" },
+  { name: "Jane Hurley", eircode: "V95C8W9", notes: "" },
+  { name: "Dormite House", eircode: "V14NY98", notes: "" },
+  { name: "Susan Hanson", eircode: "V95PR86", notes: "" },
+  { name: "Garry Hugged", eircode: "V95TD0K", notes: "" },
+  { name: "Brenda Halpin / Aine Halpin", eircode: "V95K7H7", notes: "" },
+  { name: "Casey’s", eircode: "V94 69V4", notes: "" },
+  { name: "Citygate", eircode: "V94H9YE", notes: "" },
+  { name: "Travel Lodge", eircode: "V94H9YE", notes: "" },
+  { name: "Beechwood Estate", eircode: "V95 H6EV", notes: "Estate" },
+  { name: "Bijou Delimon", eircode: "V95KF2V", notes: "" },
+  { name: "Mark Lynch", eircode: "V95R9FC", notes: "" },
+  { name: "Ballymacaula View", eircode: "V95 K6NA", notes: "Estate" },
+  { name: "Breach Na Habbain Estate", eircode: "V95 KW62", notes: "Estate" },
+  { name: "Versiv", eircode: "V15NW27", notes: "Factory Kilrush" },
+  { name: "Deloras Hamil", eircode: "V15C433", notes: "Front the guard coast" },
+  { name: "Clancy Raymond", eircode: "V15K582", notes: "The natural woman" },
+  { name: "Amanda Hannon", eircode: "V15PT02", notes: "Small mower, reverse van" },
+  { name: "Sisters of Mercy", eircode: "V15NC58", notes: "Convento" },
+  { name: "Kay Quealy", eircode: "V15TF79", notes: "Top of estate" },
+  { name: "Fiona Hynes", eircode: "V15R923", notes: "" },
+  { name: "Brid Marrinan", eircode: "V15TR24", notes: "" },
+  { name: "Killimer Ferry", eircode: "V15FK09", notes: "" },
+  { name: "Kunkele Sven", eircode: "V15 CA34", notes: "" },
+  { name: "Fiona Pope", eircode: "V15W206", notes: "" }
+];
 
-    const saveClients = clients => {
-      localStorage.setItem('clients', JSON.stringify(clients));
-      localStorage.setItem('clients-auto-backup', JSON.stringify({
-        date: new Date().toISOString(),
-        clients
-      }));
-    };
+function getClients() {
+  const saved = JSON.parse(localStorage.getItem('clients') || '[]');
+  if (saved.length === 0) return defaultClients;
+  return saved;
+}
 
-    let editingIndex = null;
+function saveClients(c) {
+  localStorage.setItem('clients', JSON.stringify(c));
+}
 
-    const addClient = safe(() => {
-      const name = nameInput.value.trim();
-      const eircode = eircodeInput.value.trim();
-      const notes = notesInput.value.trim();
+function addClient() {
+  const name = nameInput.value.trim();
+  const eircode = eircodeInput.value.trim();
+  const notes = notesInput.value.trim();
 
-      if (!name || !eircode) return alert('Nome e Eircode são obrigatórios');
+  if (!name || !eircode) return alert('Required');
 
-      const clients = getClients();
+  const clients = getClients();
 
-      if (editingIndex !== null) {
-        clients[editingIndex] = { name, eircode, notes };
-        editingIndex = null;
-      } else {
-        clients.push({ name, eircode, notes });
-      }
+  if (editingIndex !== null) {
+    clients[editingIndex] = { name, eircode, notes };
+    editingIndex = null;
+  } else {
+    clients.push({ name, eircode, notes });
+  }
 
-      saveClients(clients);
-      nameInput.value = eircodeInput.value = notesInput.value = '';
-      render();
-    });
+  saveClients(clients);
+  nameInput.value = eircodeInput.value = notesInput.value = '';
+  render();
+}
 
-    const removeClient = safe(index => {
-      const clients = getClients();
-      clients.splice(index, 1);
-      saveClients(clients);
-      render();
-    });
+function editClient(i) {
+  const c = getClients()[i];
+  nameInput.value = c.name;
+  eircodeInput.value = c.eircode;
+  notesInput.value = c.notes || '';
+  editingIndex = i;
+}
 
-    const editClient = safe(index => {
-      const c = getClients()[index];
-      nameInput.value = c.name;
-      eircodeInput.value = c.eircode;
-      notesInput.value = c.notes || '';
-      editingIndex = index;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
+function removeClient(i) {
+  const clients = getClients();
+  clients.splice(i,1);
+  saveClients(clients);
+  render();
+}
 
-    const openMaps = safe(eircode => {
-      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(eircode)}`, '_blank');
-    });
+function toggleList() {
+  showList = !showList;
+  render();
+}
 
-    const render = safe(() => {
-      const search = searchInput.value.toLowerCase();
-      list.innerHTML = '';
+function render() {
+  list.innerHTML = '';
 
-      if (!navigator.geolocation) return;
+  if (!showList) return;
 
-      navigator.geolocation.getCurrentPosition(pos => {
-        const { latitude, longitude } = pos.coords;
+  const q = search.value.toLowerCase();
 
-        getClients().forEach((c, i) => {
-          if (!c.name.toLowerCase().includes(search) && !c.eircode.toLowerCase().includes(search)) return;
+  getClients().forEach((c,i)=>{
+    if (!c.name.toLowerCase().includes(q) && !c.eircode.toLowerCase().includes(q)) return;
 
-          const div = document.createElement('div');
-          div.className = 'client';
-          div.innerHTML = `
-            <strong>${c.name}</strong><br>
-            Eircode: ${c.eircode}<br>
-            ${c.notes ? '📝 ' + c.notes + '<br>' : ''}
-            <span id="dist-${i}">📏 calculando...</span>
-            <div class="actions">
-              <button onclick="openMaps('${c.eircode}')">Maps</button>
-              <button onclick="editClient(${i})">Editar</button>
-              <button class="delete" onclick="removeClient(${i})">Excluir</button>
-            </div>`;
-          list.appendChild(div);
+    const div = document.createElement('div');
+    div.className='client';
+    div.innerHTML = `
+      <b>${c.name}</b><br>
+      ${c.eircode}<br>
+      ${c.notes || ''}
+      <div class="actions">
+        <button onclick="openMaps('${c.eircode}')">Maps</button>
+        <button onclick="editClient(${i})">Edit</button>
+        <button onclick="removeClient(${i})">Delete</button>
+      </div>`;
 
-          fetch(`https://router.project-osrm.org/route/v1/driving/${longitude},${latitude};${longitude},${latitude}?overview=false`)
-            .then(r => r.json())
-            .then(() => {
-              const km = (Math.random() * 20 + 1).toFixed(1); // fallback seguro
-              document.getElementById(`dist-${i}`).innerText = `📏 ${km} km`;
-            });
-        });
-      });
-    });
+    list.appendChild(div);
+  });
+}
 
-    const exportJSON = safe(() => {
-      const data = JSON.stringify(getClients(), null, 2);
-      const blob = new Blob([data], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'clients-backup.json';
-      a.click();
-    });
+function openMaps(e) {
+  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e)}`);
+}
 
-    const importJSON = safe(event => {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = e => {
-        const data = JSON.parse(e.target.result);
-        if (!Array.isArray(data)) throw 'Arquivo inválido';
-        saveClients(data);
-        render();
-      };
-      reader.readAsText(file);
-    });
+const nameInput = document.getElementById('name');
+const eircodeInput = document.getElementById('eircode');
+const notesInput = document.getElementById('notes');
+const search = document.getElementById('search');
+const list = document.getElementById('list');
 
-    const toggleDark = () => {
-      document.body.classList.toggle('dark');
-      localStorage.setItem('darkMode', document.body.classList.contains('dark'));
-    };
-
-    if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
-
-    const nameInput = document.getElementById('name');
-    const eircodeInput = document.getElementById('eircode');
-    const notesInput = document.getElementById('notes');
-    const searchInput = document.getElementById('search');
-    const list = document.getElementById('list');
-
-    render();
-
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
-  </script>
+render();
+</script>
 </body>
 </html>
