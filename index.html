@@ -1,374 +1,77 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Landscape Clients</title>
-  
-  <!-- Manifest PWA -->
-  <link rel="manifest" href="manifest.json" />
-  
-  <!-- iOS specific meta -->
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Clients" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png" />
-  <!-- Para splash screen, pode adicionar depois -->
-  
-  <style>
-    :root {
-      --bg: #f7fafc;
-      --text: #1a202c;
-      --card: #ffffff;
-      --header: #2f855a;
-      --button: #2f855a;
-      --danger: #e53e3e;
-      --secondary: #3182ce;
-      --border: #cbd5e0;
-    }
+// Renderização com distância (CORRIGIDA)
+function render() {
+  const searchTerm = document.getElementById('search').value.toLowerCase();
+  const listDiv = document.getElementById('list');
+  listDiv.innerHTML = '';
 
-    body.dark {
-      --bg: #1a202c;
-      --text: #edf2f7;
-      --card: #2d3748;
-      --header: #22543d;
-      --button: #38a169;
-      --danger: #fc8181;
-      --secondary: #63b3ed;
-      --border: #4a5568;
-    }
+  if (!showList) return;
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      margin: 0;
-      padding: 16px;
-      background: var(--bg);
-      color: var(--text);
-      transition: background-color 0.3s ease, color 0.2s ease;
-    }
+  const clients = getClients();
+  if (clients.length === 0) {
+    listDiv.innerHTML = '<p style="text-align:center;">No clients yet.</p>';
+    return;
+  }
 
-    input, textarea, button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 8px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--card);
-      color: var(--text);
-      font-size: 16px;
-      box-sizing: border-box;
-    }
-
-    button {
-      background: var(--button);
-      color: white;
-      border: none;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-    button:hover { opacity: 0.9; }
-
-    .client {
-      background: var(--card);
-      border-radius: 12px;
-      padding: 16px;
-      margin-top: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      border: 1px solid var(--border);
-    }
-
-    .actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
-    }
-    .actions button {
-      flex: 1;
-      background: var(--secondary);
-      padding: 10px;
-    }
-    .actions .delete { background: var(--danger); }
-
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    #themeBtn {
-      width: 48px;
-      height: 48px;
-      font-size: 24px;
-      border-radius: 50%;
-      background: var(--card);
-      color: var(--text);
-      border: 1px solid var(--border);
-      padding: 0;
-      margin: 0;
-    }
-
-    h2, h3 { margin: 16px 0 8px; }
-
-    #list { margin-top: 16px; }
-
-    .distance {
-      font-size: 0.9em;
-      color: var(--secondary);
-      margin-top: 8px;
-    }
-  </style>
-</head>
-<body>
-
-<div class="topbar">
-  <h1 style="margin:0;">🌿 Clients</h1>
-  <button id="themeBtn" onclick="toggleDark()">🌙</button>
-</div>
-
-<h3>➕ Add Client</h3>
-<input id="name" placeholder="Name / Nome" />
-<input id="eircode" placeholder="Eircode" />
-<textarea id="notes" placeholder="Notes / Observações" rows="2"></textarea>
-<button onclick="addClient()">Save / Salvar</button>
-
-<h3>🔍 Search</h3>
-<input id="search" placeholder="Search name or eircode..." oninput="render()" />
-
-<div style="display: flex; gap: 8px; margin: 16px 0;">
-  <button onclick="toggleList()" style="flex:2;">👁️ Show / Hide Clients</button>
-  <button onclick="exportJSON()" style="flex:1;">📤 Backup</button>
-</div>
-
-<input type="file" id="importFile" accept=".json" style="display:none;" onchange="importJSON(event)" />
-<button onclick="document.getElementById('importFile').click()" style="background: var(--secondary);">📥 Restore Backup</button>
-
-<div id="list"></div>
-
-<script>
-  // Estado global
-  let showList = true; // começa visível
-  let editingIndex = null;
-
-  // Base de clientes padrão (seus dados)
-  const defaultClients = [
-    { name: "Fiona Ryan", eircode: "V95TR29", notes: "joga no penhasco" },
-    { name: "Admiralty Lodge", eircode: "V95TE8A", notes: "" },
-    { name: "Joan Laffan", eircode: "V95K6V3", notes: "" }
-  ];
-
-  // Funções de armazenamento
-  function getClients() {
-    const saved = localStorage.getItem('clients');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return defaultClients;
+  // Se não houver permissão de localização, apenas mostra os cards sem distância
+  if (!navigator.geolocation) {
+    // Itera sobre o array original, mas só mostra os que passam no filtro
+    clients.forEach((c, originalIndex) => {
+      if (c.name.toLowerCase().includes(searchTerm) || c.eircode.toLowerCase().includes(searchTerm)) {
+        const card = createClientCard(c, originalIndex, null);
+        listDiv.appendChild(card);
       }
-    }
-    return defaultClients;
-  }
-
-  function saveClients(clients) {
-    localStorage.setItem('clients', JSON.stringify(clients));
-    autoBackup(clients);
-    render();
-  }
-
-  function autoBackup(clients) {
-    localStorage.setItem('clients-auto-backup', JSON.stringify({
-      date: new Date().toISOString(),
-      clients: clients
-    }));
-  }
-
-  // CRUD
-  function addClient() {
-    const name = document.getElementById('name').value.trim();
-    const eircode = document.getElementById('eircode').value.trim();
-    const notes = document.getElementById('notes').value.trim();
-    if (!name || !eircode) return alert('Name and Eircode are required');
-
-    const clients = getClients();
-    if (editingIndex !== null) {
-      clients[editingIndex] = { name, eircode, notes };
-      editingIndex = null;
-    } else {
-      clients.push({ name, eircode, notes });
-    }
-
-    saveClients(clients);
-    document.getElementById('name').value = '';
-    document.getElementById('eircode').value = '';
-    document.getElementById('notes').value = '';
-  }
-
-  function removeClient(index) {
-    const clients = getClients();
-    clients.splice(index, 1);
-    saveClients(clients);
-  }
-
-  function editClient(index) {
-    const clients = getClients();
-    const c = clients[index];
-    document.getElementById('name').value = c.name;
-    document.getElementById('eircode').value = c.eircode;
-    document.getElementById('notes').value = c.notes || '';
-    editingIndex = index;
-  }
-
-  // Renderização com distância
-  function render() {
-    const searchTerm = document.getElementById('search').value.toLowerCase();
-    const listDiv = document.getElementById('list');
-    listDiv.innerHTML = '';
-
-    if (!showList) return;
-
-    const clients = getClients();
-    if (clients.length === 0) {
-      listDiv.innerHTML = '<p style="text-align:center;">No clients yet.</p>';
-      return;
-    }
-
-    // Filtro
-    const filtered = clients.filter(c =>
-      c.name.toLowerCase().includes(searchTerm) ||
-      c.eircode.toLowerCase().includes(searchTerm)
-    );
-
-    // Se não houver permissão de localização, apenas mostra os cards sem distância
-    if (!navigator.geolocation) {
-      renderClientsWithoutDistance(filtered);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      pos => renderWithDistance(filtered, pos.coords.latitude, pos.coords.longitude),
-      err => renderClientsWithoutDistance(filtered)
-    );
-  }
-
-  function renderClientsWithoutDistance(clients) {
-    const listDiv = document.getElementById('list');
-    clients.forEach((c, idx) => {
-      const card = createClientCard(c, idx, null);
-      listDiv.appendChild(card);
     });
+    return;
   }
 
-  function renderWithDistance(clients, lat, lon) {
-    const listDiv = document.getElementById('list');
-    clients.forEach((c, idx) => {
-      const card = createClientCard(c, idx, { lat, lon });
-      listDiv.appendChild(card);
-      // Buscar distância via OSRM
-      fetch(`https://router.project-osrm.org/route/v1/driving/${lon},${lat};${c.eircode}?overview=false`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.routes && data.routes[0]) {
-            const km = (data.routes[0].distance / 1000).toFixed(1);
-            const distSpan = document.getElementById(`dist-${idx}`);
-            if (distSpan) distSpan.innerText = `📏 ${km} km`;
-          }
-        })
-        .catch(() => {});
-    });
-  }
-
-  function createClientCard(client, index, coords) {
-    const div = document.createElement('div');
-    div.className = 'client';
-    div.innerHTML = `
-      <strong>${client.name}</strong><br>
-      <span style="font-size:0.9em;">${client.eircode}</span><br>
-      ${client.notes ? `<small>📝 ${client.notes}</small><br>` : ''}
-      <div class="distance" id="dist-${index}">${coords ? '📏 calculando...' : ''}</div>
-      <div class="actions">
-        <button onclick="editClient(${index})">✏️ Edit</button>
-        <button onclick="openMaps('${client.eircode}')">🗺️ Maps</button>
-        <button class="delete" onclick="removeClient(${index})">🗑️ Delete</button>
-      </div>
-    `;
-    return div;
-  }
-
-  function openMaps(eircode) {
-    window.open(`https://www.google.com/maps/search/?api=1&query=${eircode}`, '_blank');
-  }
-
-  // Backup / Restore
-  function exportJSON() {
-    const data = JSON.stringify(getClients(), null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'clients-backup.json';
-    a.click();
-  }
-
-  function importJSON(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-      try {
-        const data = JSON.parse(e.target.result);
-        saveClients(data);
-        alert('Backup restaurado com sucesso!');
-      } catch (error) {
-        alert('Arquivo inválido');
-      }
-    };
-    reader.readAsText(file);
-  }
-
-  // Dark mode
-  function toggleDark() {
-    document.body.classList.toggle('dark');
-    const isDark = document.body.classList.contains('dark');
-    localStorage.setItem('darkMode', isDark);
-    document.getElementById('themeBtn').innerText = isDark ? '☀️' : '🌙';
-  }
-
-  function initDarkMode() {
-    const stored = localStorage.getItem('darkMode');
-    if (stored !== null) {
-      const isDark = stored === 'true';
-      document.body.classList.toggle('dark', isDark);
-      document.getElementById('themeBtn').innerText = isDark ? '☀️' : '🌙';
-    } else {
-      // Verifica preferência do sistema
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.body.classList.toggle('dark', prefersDark);
-      document.getElementById('themeBtn').innerText = prefersDark ? '☀️' : '🌙';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude, longitude } = pos.coords;
+      // Itera sobre o array original, filtrando
+      clients.forEach((c, originalIndex) => {
+        if (c.name.toLowerCase().includes(searchTerm) || c.eircode.toLowerCase().includes(searchTerm)) {
+          const card = createClientCard(c, originalIndex, { lat: latitude, lon: longitude });
+          listDiv.appendChild(card);
+          // Buscar distância via OSRM usando o eircode
+          fetch(`https://router.project-osrm.org/route/v1/driving/${longitude},${latitude};${c.eircode}?overview=false`)
+            .then(r => r.json())
+            .then(data => {
+              if (data.routes && data.routes[0]) {
+                const km = (data.routes[0].distance / 1000).toFixed(1);
+                const distSpan = document.getElementById(`dist-${originalIndex}`);
+                if (distSpan) distSpan.innerText = `📏 ${km} km`;
+              }
+            })
+            .catch(() => {});
+        }
+      });
+    },
+    err => {
+      // Em caso de erro de localização, mostra sem distância
+      clients.forEach((c, originalIndex) => {
+        if (c.name.toLowerCase().includes(searchTerm) || c.eircode.toLowerCase().includes(searchTerm)) {
+          const card = createClientCard(c, originalIndex, null);
+          listDiv.appendChild(card);
+        }
+      });
     }
-  }
+  );
+}
 
-  // Show/hide list
-  function toggleList() {
-    showList = !showList;
-    render();
-    const btn = document.querySelector('button[onclick="toggleList()"]');
-    if (btn) btn.innerText = showList ? '👁️ Hide Clients' : '👁️ Show Clients';
-  }
-
-  // Registrar service worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js');
-  }
-
-  // Inicialização
-  window.onload = function() {
-    initDarkMode();
-    render();
-    // Atualiza texto do botão
-    const btn = document.querySelector('button[onclick="toggleList()"]');
-    if (btn) btn.innerText = showList ? '👁️ Hide Clients' : '👁️ Show Clients';
-  };
-</script>
-</body>
-</html>
+// Função createClientCard (ajustada para receber o índice original)
+function createClientCard(client, originalIndex, coords) {
+  const div = document.createElement('div');
+  div.className = 'client';
+  div.innerHTML = `
+    <strong>${client.name}</strong><br>
+    <span style="font-size:0.9em;">${client.eircode}</span><br>
+    ${client.notes ? `<small>📝 ${client.notes}</small><br>` : ''}
+    <div class="distance" id="dist-${originalIndex}">${coords ? '📏 calculando...' : ''}</div>
+    <div class="actions">
+      <button onclick="editClient(${originalIndex})">✏️ Edit</button>
+      <button onclick="openMaps('${client.eircode}')">🗺️ Maps</button>
+      <button class="delete" onclick="removeClient(${originalIndex})">🗑️ Delete</button>
+    </div>
+  `;
+  return div;
+}
