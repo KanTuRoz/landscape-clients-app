@@ -1,4 +1,4 @@
-const CACHE_NAME = 'landscape-clients-v1';
+const CACHE_NAME = 'landscape-clients-v2';
 const urlsToCache = [
   './',
   './index.html',
